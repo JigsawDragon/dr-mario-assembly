@@ -1,4 +1,4 @@
-# dr-mario-asembly
+# dr-mario-assembly
 
 This is an adaptation of the Dr.Mario game made on a 32x32 grid of an Assembly project using MIPS ruleset. Although this project was part of the curriculum for a circuits and assembly course, students were not given a template to work with so all of this has been done from scratch. In the span of 2 weeks I created a functioning logic dr mario game with physics, stack logic, and a full understanding of registers in a memory's processor. 
 
