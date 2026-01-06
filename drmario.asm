@@ -1,3 +1,11 @@
+################# CSC258 Assembly Final Project ###################
+# This file contains our implementation of Dr Mario.
+#
+# Student 1: Siddharth Iyer, 1010077827
+#
+# We assert that the code submitted here is entirely our own 
+# creation, and will indicate otherwise when it is not.
+#
 ######################## Bitmap Display Configuration ########################
 # - Unit width in pixels:       2
 # - Unit height in pixels:      2
@@ -11,10 +19,10 @@
 ##############################################################################
 # Immutable Data
 ##############################################################################
-# Address for display
+# The address of the bitmap display. Don't forget to connect it!
 ADDR_DSPL:
     .word 0x10008000
-# Address for Keyboard
+# The address of the keyboard. Don't forget to connect it!
 ADDR_KBRD:
     .word 0xffff0000
 
@@ -134,8 +142,6 @@ game_loop:
             li 	$v0, 32
         	li 	$a0, 16
         	syscall
-        	
-        	jal check_loss_barrier
         
         # 5. Go back to Step 1
         j game_loop
@@ -459,7 +465,9 @@ auto_fall:
             
             pill_stopped:
                 sw $zero frame_counter # resets frame counter for new pill
-                jal draw_pill_initial
+                jal draw_pill  # Draw the stopped pill first
+                jal check_loss_barrier  # NOW check if game is lost
+                jal draw_pill_initial  # Spawn new pill
             
             skip_auto_fall:
                 pop ($a0)
@@ -692,48 +700,52 @@ check_loss_barrier:
     push($t4)
     push($t5)
     push($t6)
-    push($t7)  
+    push($t7)
+    push($s0)
+    push($s1)
     
     la $t1, ADDR_DSPL
     lw $t2, 0($t1)          
-    addi $t2, $t2, 1080    
+    addi $t2, $t2, 1080     # Barrier line
     
     la $t7, colour_black   
-    lw $t4, 0($t7)         
+    lw $t4, 0($t7)          # Black color
+    
+    la $t7, colour_white
+    lw $t6, 0($t7)          # White color (bottle walls)
+    
+    # Load current pill positions to EXCLUDE them
+    lw $s0, CAPSULE_left
+    lw $s1, CAPSULE_right
     
     li $t1, 0    # counter
 
 barrier_loop:
-    lw $t5, 0($t2)        
-    beq $t5, $t4, skip_pixel_check 
+    # Skip if this is the active pill
+    beq $t2, $s0, skip_pixel_check
+    beq $t2, $s1, skip_pixel_check
     
-    lb $t6, CAPSULE_orientation 
-    beq $t6, 0, check_loss_h
-    beq $t6, 1, check_loss_v
-
-check_loss_h:
-    move $t3, $t2           # copy to not step over registers
-    addi $t3, $t3, 128      # check under left
-    lw $t5, 0($t3)
-    bne $t5, $t4, game_over_loser
+    lw $t5, 0($t2)          # Load pixel color at barrier
+    beq $t5, $t4, skip_pixel_check  # Skip if black (empty)
+    beq $t5, $t6, skip_pixel_check  # Skip if white (bottle wall)
     
-    addi $t3, $t3, 4        # check under right
-    lw $t5, 0($t3)
-    bne $t5, $t4, game_over_loser
-    j skip_pixel_check  
-
-check_loss_v:
-    move $t3, $t2
-    addi $t3, $t3, 256 # check 2 under
-    lw $t5, 0($t3)
-    bne $t5, $t4, game_over_loser
+    # Found a settled colored pixel at barrier
+    # Check if there's a non-black pixel directly below it
+    addi $t3, $t2, 128
+    lw $t7, 0($t3)
+    beq $t7, $t4, skip_pixel_check  # Black below = can still fall, OK
+    
+    # Non-black below = stacked to top, game over!
+    j game_over_loser
 
 skip_pixel_check:
     addi $t2, $t2, 4       
     addi $t1, $t1, 1        
-    blt $t1, 5, barrier_loop 
+    blt $t1, 18, barrier_loop   # Check 18 pixels across (the bottle width)
 
 finish_barrier_check:
+    pop($s1)
+    pop($s0)
     pop($t7)
     pop($t6)
     pop($t5)
@@ -2044,7 +2056,7 @@ again:
     
     check_for_again:
         lw $t2, 4($s2)
-        beq $t2, 114 restart
+        beq $t2, 114, restart
         beq $t2, 113, respond_to_Q
         j wait_again
     restart:
